@@ -4,10 +4,22 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 
-# Configuração da Página
-st.set_page_config(page_title="Investidor Pro AI", layout="wide")
+# 1. Configuração da Página para Melhor Visualização em Celular
+st.set_page_config(
+    page_title="Investidor Pro AI", 
+    layout="wide", 
+    initial_sidebar_state="collapsed" # Começa fechado para ganhar espaço no celular
+)
 
-# Sidebar - Menu de Navegação
+# Estilo CSS para ajustar fontes em telas pequenas
+st.markdown("""
+    <style>
+    [data-testid="stMetricValue"] { font-size: 1.8rem; }
+    .main .block-container { padding-top: 1rem; padding-bottom: 1rem; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# 2. Sidebar - Menu de Navegação
 st.sidebar.title("🚀 Menu Investidor")
 aba_selecionada = st.sidebar.radio("Ir para:", ["Dashboard Principal", "Análise de Dividendos", "Checklist de Saúde"])
 
@@ -21,43 +33,42 @@ try:
 
     # --- ABA 1: DASHBOARD PRINCIPAL ---
     if aba_selecionada == "Dashboard Principal":
-        st.header(f"📊 Panorama: {info.get('longName', ticker)}")
+        st.header(f"📊 {info.get('shortName', ticker)}")
         
-        # Cards de Destaque
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Preço Atual", f"R$ {info.get('currentPrice', 0):.2f}")
+        # No celular, colunas se empilham automaticamente
+        c1, c2 = st.columns(2)
+        c3, c4 = st.columns(2)
+        
+        c1.metric("Preço", f"R$ {info.get('currentPrice', 0):.2f}")
         c2.metric("P/L", f"{info.get('forwardPE', 0):.2f}")
         c3.metric("P/VP", f"{info.get('priceToBook', 0):.2f}")
-        c4.metric("Dividend Yield", f"{info.get('dividendYield', 0)*100:.2f}%")
+        c4.metric("DY", f"{info.get('dividendYield', 0)*100:.2f}%")
 
-        # Gráfico de Preço Interativo
-        st.subheader("Evolução Patrimonial (5 Anos)")
-        fig = px.line(hist, x=hist.index, y='Close', labels={'Close': 'Preço', 'Date': 'Data'})
+        st.subheader("Evolução (5 Anos)")
+        # use_container_width=True é essencial para responsividade
+        fig = px.line(hist, x=hist.index, y='Close', template="plotly_dark")
         fig.update_traces(line_color='#00FF00')
+        fig.update_layout(margin=dict(l=0, r=0, t=0, b=0), height=300)
         st.plotly_chart(fig, use_container_width=True)
 
     # --- ABA 2: ANÁLISE DE DIVIDENDOS ---
     elif aba_selecionada == "Análise de Dividendos":
-        st.header("💰 Estratégia de Renda Passiva")
+        st.header("💰 Renda Passiva")
         
         preco_atual = info.get('currentPrice', 1)
         dps = info.get('dividendRate', 0) or (preco_atual * info.get('dividendYield', 0))
         preco_teto = dps / 0.06
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write(f"**Dividendos por Ação (12m):** R$ {dps:.2f}")
-            st.write(f"**Preço Teto (Método Barsi - 6%):** R$ {preco_teto:.2f}")
+        st.write(f"**Dividendos/Ação:** R$ {dps:.2f}")
+        st.write(f"**Preço Teto (6%):** R$ {preco_teto:.2f}")
         
-        with col2:
-            margem = (preco_teto / preco_atual - 1) * 100
-            st.metric("Margem de Segurança", f"{margem:.2f}%", delta=f"{margem:.2f}%")
+        margem = (preco_teto / preco_atual - 1) * 100
+        st.metric("Margem de Segurança", f"{margem:.2f}%", delta=f"{margem:.2f}%")
 
     # --- ABA 3: CHECKLIST DE SAÚDE ---
     elif aba_selecionada == "Checklist de Saúde":
-        st.header("✅ Critérios de Qualidade e Valor")
+        st.header("✅ Checklist de Valor")
         
-        # Cálculos Necessários para o Checklist
         preco_atual = info.get('currentPrice', 0)
         dps = info.get('dividendRate', 0) or (preco_atual * info.get('dividendYield', 0))
         preco_teto = dps / 0.06
@@ -68,14 +79,11 @@ try:
             else:
                 st.error(f"❌ {texto}")
 
-        # Parâmetro de Preço Teto (Novo)
-        check(preco_atual <= preco_teto, f"Preço Teto: R$ {preco_teto:.2f} (Preço atual R$ {preco_atual:.2f} {'abaixo' if preco_atual <= preco_teto else 'acima'} do teto)")
-        
-        # Demais Parâmetros
-        check(info.get('returnOnEquity', 0) > 0.15, f"ROE de {info.get('returnOnEquity', 0)*100:.2f}% (Acima de 15% ideal)")
-        check(info.get('profitMargins', 0) > 0.10, f"Margem Líquida de {info.get('profitMargins', 0)*100:.2f}% (Acima de 10% ideal)")
-        check(info.get('debtToEquity', 0) < 100, f"Dívida/Patrimônio de {info.get('debtToEquity', 0):.2f}% (Abaixo de 100% ideal)")
-        check(info.get('dividendYield', 0) > 0.05, f"Dividend Yield de {info.get('dividendYield', 0)*100:.2f}% (Acima de 5% ideal)")
+        # Parâmetros com foco em leitura rápida no celular
+        check(preco_atual <= preco_teto, f"Preço Teto: R$ {preco_teto:.2f} (Atual: R$ {preco_atual:.2f})")
+        check(info.get('returnOnEquity', 0) > 0.15, f"ROE: {info.get('returnOnEquity', 0)*100:.1f}% (>15%)")
+        check(info.get('profitMargins', 0) > 0.10, f"Margem: {info.get('profitMargins', 0)*100:.1f}% (>10%)")
+        check(info.get('debtToEquity', 0) < 100, f"Dívida/Patrimônio: {info.get('debtToEquity', 0):.1f}% (<100%)")
 
 except Exception as e:
-    st.error(f"Erro ao processar dados: {e}")
+    st.error("Ativo não encontrado. Verifique o Ticker.")
